@@ -1,1 +1,47 @@
 @import "tailwindcss";
+
+@theme {
+    --color-grid-bg:          #f8fafc;
+    --color-cell-empty:       #ffffff;
+    --color-cell-wall:        #374151;
+    --color-cell-start:       #10b981;
+    --color-cell-goal:        #f59e0b;
+    --color-cell-agent:       #3b82f6;
+    --color-q-positive:       #dcfce7;
+    --color-q-negative:       #fef2f2;
+    
+    /* Custom animation tokens */
+    --animate-pulse-slow: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-bounce-subtle: bounce 1s ease-in-out 2;
+}
+
+@layer base {
+    body {
+        @apply bg-gray-50 font-sans;
+    }
+}
+
+@layer components {
+  .grid-cell {
+    @apply w-12 h-12 border border-gray-300 flex items-center justify-center text-xs font-medium transition-all duration-200;
+  }
+  
+  .control-button {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2;
+  }
+  
+  .metric-card {
+    @apply bg-white p-4 rounded-lg shadow-sm border border-gray-200;
+  }
+  
+  .parameter-slider {
+    @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
+  }
+}
+
+
+@layer utilities {
+    .cell-glow {
+        @apply shadow-lg ring-2 ring-blue-400 ring-opacity-50;
+    }
+}
