@@ -27,4 +27,28 @@ export const getNextPosition = (currentPos, action) => {
     const[row, col] = currentPos;
     const [dRow, dCol] = ACTION_VECTORS[action];
     return [row + dRow, col + dCol];
-}
+};
+
+// get valid actions from given positions.
+export const getValidActions = (grid, position) => {
+    const [row, col] = position;
+    const validActions = [];
+
+    Object.keys(ACTIONS).forEach(actionKey => {
+        const action = ACTIONS[actionKey];
+        const [nextRow, nextCol] = getNextPosition([row, col], action);
+
+        if(isValidPosition(nextRow, nextCol, grid.length) &&
+            !isWall(GRID_PRESENTS, nextRow, nextCol)) {
+                validActions.push(action);
+            }
+    });
+    return validActions;
+};
+
+// calculating the manhattan distance between two positions.
+export const manhattanDistance = (pos1, pos2) => {
+  const [r1, c1] = pos1;
+  const [r2, c2] = pos2;
+  return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+};
