@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
-  TRAINING_CONSTANTS,
+  TRAINING,
   ACTIONS,
-  TRAINING_SPEEDS
 } from '../utils/constants.js';
 import {
   positionToState,
@@ -20,7 +19,7 @@ export const useTraining = (gridWorld, qLearning) => {
   const [isPaused, setIsPaused] = useState(false);
   const [currentEpisode, setCurrentEpisode] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
-  const [maxEpisodes, setMaxEpisodes] = useState(TRAINING_CONSTANTS.MAX_EPISODES);
+  const [maxEpisodes, setMaxEpisodes] = useState(TRAINING.MAX_EPISODES);
   
   // Episode State
   const [episodeReward, setEpisodeReward] = useState(0);
@@ -28,7 +27,7 @@ export const useTraining = (gridWorld, qLearning) => {
   const [isEpisodeComplete, setIsEpisodeComplete] = useState(false);
   
   // Training Control
-  const [trainingSpeed, setTrainingSpeed] = useState(TRAINING_SPEEDS.NORMAL);
+  const [trainingSpeed, setTrainingSpeed] = useState(TRAINING.NORMAL);
   const [autoStop, setAutoStop] = useState(true);
   const [visualizeTraining, setVisualizeTraining] = useState(true);
   
@@ -140,7 +139,7 @@ export const useTraining = (gridWorld, qLearning) => {
     }]);
     
     // Check if episode is complete
-    if (isDone || episodeSteps >= TRAINING_CONSTANTS.MAX_STEPS_PER_EPISODE) {
+    if (isDone || episodeSteps >= TRAINING.MAX_STEPS_PER_EPISODE) {
       completeEpisode(isDone, reward);
       return true; // Episode completed
     }

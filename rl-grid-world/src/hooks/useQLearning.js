@@ -3,13 +3,13 @@ import {
   ACTIONS,
   ALGORITHMS,
   EXPLORATION_STRATEGIES,
-  DEFAULT_RL_PARAMS,
+  RL_PARAMS,
   REWARDS,
-  TRAINING_CONSTANTS
+  TRAINING
 } from '../utils/constants.js';
 import {
   initializeQTable,
-  updateQValue,
+  updateQTable,
   selectAction,
   getGreedyPolicy,
   calculateReward,
@@ -35,7 +35,7 @@ export const useQLearning = (gridWorld) => {
   const [explorationStrategy, setExplorationStrategy] = useState(EXPLORATION_STRATEGIES.EPSILON_GREEDY);
   
   // RL Parameters
-  const [parameters, setParameters] = useState(DEFAULT_RL_PARAMS);
+  const [parameters, setParameters] = useState(RL_PARAMS);
   const [rewardStructure, setRewardStructure] = useState(REWARDS.DEFAULT);
   
   // Training State
@@ -144,7 +144,7 @@ export const useQLearning = (gridWorld) => {
       
       switch (algorithm) {
         case ALGORITHMS.Q_LEARNING:
-          updateQValue(
+          updateQTable(
             newQTable,
             state,
             action,
@@ -159,7 +159,7 @@ export const useQLearning = (gridWorld) => {
           
         case ALGORITHMS.SARSA:
           // For SARSA, we need the next action (this would be passed from training loop)
-          updateQValue(
+          updateQTable(
             newQTable,
             state,
             action,
@@ -173,7 +173,7 @@ export const useQLearning = (gridWorld) => {
           break;
           
         case ALGORITHMS.EXPECTED_SARSA:
-          updateQValue(
+          updateQTable(
             newQTable,
             state,
             action,
@@ -262,8 +262,8 @@ export const useQLearning = (gridWorld) => {
 
     const convergenceResult = checkConvergence(
       qTable,
-      TRAINING_CONSTANTS.CONVERGENCE_THRESHOLD,
-      TRAINING_CONSTANTS.CONVERGENCE_WINDOW
+      TRAINING.CONVERGENCE_THRESHOLD,
+      TRAINING.CONVERGENCE_WINDOW
     );
 
     setConvergenceInfo(prev => ({
@@ -335,7 +335,7 @@ export const useQLearning = (gridWorld) => {
   const importConfiguration = useCallback((config) => {
     try {
       setQTable(config.qTable || {});
-      setParameters(config.parameters || DEFAULT_RL_PARAMS);
+      setParameters(config.parameters || RL_PARAMS);
       setAlgorithm(config.algorithm || ALGORITHMS.Q_LEARNING);
       setExplorationStrategy(config.explorationStrategy || EXPLORATION_STRATEGIES.EPSILON_GREEDY);
       setRewardStructure(config.rewardStructure || REWARDS.DEFAULT);

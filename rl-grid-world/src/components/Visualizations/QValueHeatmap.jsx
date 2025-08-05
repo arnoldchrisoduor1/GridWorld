@@ -14,8 +14,8 @@ import {
   ACTIONS, 
   ACTION_SYMBOLS,
   CELL_TYPES 
-} from '../utils/constants.js';
-import { stateToPosition, positionToState } from '../utils/gridUtils.js';
+} from '../../utils/constants.js';
+import { stateToPosition, positionToState } from '../../utils/gridUtils.js';
 
 /**
  * Q-Value Heatmap Component - Visualizes Q-values with color coding

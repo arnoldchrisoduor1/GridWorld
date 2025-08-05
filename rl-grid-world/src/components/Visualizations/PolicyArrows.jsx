@@ -18,8 +18,8 @@ import {
   ACTION_VECTORS,
   ACTION_SYMBOLS,
   CELL_TYPES 
-} from '../utils/constants.js';
-import { stateToPosition, positionToState } from '../utils/gridUtils.js';
+} from '../../utils/constants.js';
+import { stateToPosition, positionToState } from '../../utils/gridUtils.js';
 
 /**
  * Policy Arrows Component - Visualizes the learned policy with directional arrows

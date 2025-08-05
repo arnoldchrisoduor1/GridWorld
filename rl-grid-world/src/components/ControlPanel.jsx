@@ -13,7 +13,7 @@ import {
   ChevronUp,
   Info
 } from 'lucide-react';
-import { TRAINING_SPEEDS, ALGORITHMS, EXPLORATION_STRATEGIES } from '../utils/constants.js';
+import { TRAINING, ALGORITHMS, EXPLORATION_STRATEGIES } from '../utils/constants';
 
 /**
  * Main control panel for training management and quick actions
@@ -352,14 +352,14 @@ const ControlPanel = ({
                   Training Speed
                 </label>
                 <select
-                  value={training.trainingStatus.speed || TRAINING_SPEEDS.NORMAL}
+                  value={training.trainingStatus.speed || TRAINING.ANIMATION_SPEEDS.NORMAL}
                   onChange={(e) => training.setTrainingSpeed(parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value={TRAINING_SPEEDS.SLOW}>Slow (1s)</option>
-                  <option value={TRAINING_SPEEDS.NORMAL}>Normal (100ms)</option>
-                  <option value={TRAINING_SPEEDS.FAST}>Fast (10ms)</option>
-                  <option value={TRAINING_SPEEDS.VERY_FAST}>Very Fast (1ms)</option>
+                  <option value={TRAINING.ANIMATION_SPEEDS.SLOW}>Slow (1s)</option>
+                  <option value={TRAINING.ANIMATION_SPEEDS.NORMAL}>Normal (100ms)</option>
+                  <option value={TRAINING.ANIMATION_SPEEDS.FAST}>Fast (10ms)</option>
+                  <option value={TRAINING.ANIMATION_SPEEDS.VERY_FAST}>Very Fast (1ms)</option>
                 </select>
               </div>
 

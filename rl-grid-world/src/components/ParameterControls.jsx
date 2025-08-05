@@ -17,8 +17,8 @@ import {
   ALGORITHMS, 
   EXPLORATION_STRATEGIES, 
   REWARDS,
-  DEFAULT_RL_PARAMS,
-  RL_PARAM_RANGES 
+  RL_PARAMS,
+//   RL_PARAM_RANGES 
 } from '../utils/constants.js';
 
 /**
@@ -96,7 +96,7 @@ const ParameterControls = ({ qLearning, onClose }) => {
    * Reset to default parameters
    */
   const resetToDefaults = useCallback(() => {
-    setTempParameters(DEFAULT_RL_PARAMS);
+    setTempParameters(RL_PARAMS);
     setHasChanges(true);
   }, []);
 
@@ -326,8 +326,8 @@ const ParameterControls = ({ qLearning, onClose }) => {
               <ParameterSlider
                 label="Learning Rate (α)"
                 param="learningRate"
-                min={RL_PARAM_RANGES.learningRate.min}
-                max={RL_PARAM_RANGES.learningRate.max}
+                min={RL_PARAMS.learningRate.min}
+                max={RL_PARAMS.learningRate.max}
                 step={0.01}
                 description="How much to update Q-values on each step. Higher values learn faster but may be less stable."
               />
@@ -335,8 +335,8 @@ const ParameterControls = ({ qLearning, onClose }) => {
               <ParameterSlider
                 label="Discount Factor (γ)"
                 param="discountFactor"
-                min={RL_PARAM_RANGES.discountFactor.min}
-                max={RL_PARAM_RANGES.discountFactor.max}
+                min={RL_PARAMS.discountFactor.min}
+                max={RL_PARAMS.discountFactor.max}
                 step={0.01}
                 description="How much to value future rewards. Higher values consider long-term rewards more."
               />
@@ -362,8 +362,8 @@ const ParameterControls = ({ qLearning, onClose }) => {
               <ParameterSlider
                 label="Epsilon (ε)"
                 param="epsilon"
-                min={RL_PARAM_RANGES.epsilon.min}
-                max={RL_PARAM_RANGES.epsilon.max}
+                min={RL_PARAMS.epsilon.min}
+                max={RL_PARAMS.epsilon.max}
                 step={0.01}
                 description="Probability of taking random actions for exploration"
               />
@@ -371,8 +371,8 @@ const ParameterControls = ({ qLearning, onClose }) => {
               <ParameterSlider
                 label="Epsilon Decay"
                 param="epsilonDecay"
-                min={RL_PARAM_RANGES.epsilonDecay.min}
-                max={RL_PARAM_RANGES.epsilonDecay.max}
+                min={RL_PARAMS.epsilonDecay.min}
+                max={RL_PARAMS.epsilonDecay.max}
                 step={0.0001}
                 description="Rate at which epsilon decreases over time"
                 formatValue={(v) => v.toFixed(4)}

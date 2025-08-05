@@ -132,17 +132,17 @@ export const EXPLORATION_STRATEGIES = {
     BOLTZMAN: 'boltzman'
 };
 
-export const GRID_PRESENTS = {
+export const GRID_PRESETS = {
     EMPTY: 'empty',
     SIMPLE_MAZE: 'simple-maze',
     COMPLEX_MAZE: 'complex-maze',
     FOUR_ROOMS: 'four-rooms'
 };
 
-export const DEFULT_GRID_CONFIG = {
+export const DEFAULT_GRID_CONFIG = {
     size: GRID_SIZE.DEFAULT,
     startPos: [0, 0],
     goalPos: [GRID_SIZE.DEFAULT - 1, GRID_SIZE.DEFAULT - 1],
     walls: [],
-    present: GRID_PRESENTS.EMPTY
+    present: GRID_PRESETS.EMPTY
 }

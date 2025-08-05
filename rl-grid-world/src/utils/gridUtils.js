@@ -68,7 +68,7 @@ export const positionToState = (position, gridSize) => {
 
 
 // convert 1d state index to 2d state position.
-export const stateToPoisition = (state, gridSize) => {
+export const stateToPosition = (state, gridSize) => {
     const row = Math.floor(state / gridSize);
     const col = state % gridSize;
     return [row, col];
