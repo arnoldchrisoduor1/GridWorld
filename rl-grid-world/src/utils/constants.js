@@ -139,7 +139,7 @@ export const GRID_PRESENTS = {
     FOUR_ROOMS: 'four-rooms'
 };
 
-export const DEFULT_GRID_CONFIG  = {
+export const DEFULT_GRID_CONFIG = {
     size: GRID_SIZE.DEFAULT,
     startPos: [0, 0],
     goalPos: [GRID_SIZE.DEFAULT - 1, GRID_SIZE.DEFAULT - 1],
