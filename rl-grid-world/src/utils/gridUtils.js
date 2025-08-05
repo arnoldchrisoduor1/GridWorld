@@ -52,3 +52,9 @@ export const manhattanDistance = (pos1, pos2) => {
   const [r2, c2] = pos2;
   return Math.abs(r1 - r2) + Math.abs(c1 - c2);
 };
+
+// calculating the euclidian distance between two positions.
+export const euclidianDistance = (pos1, pos2) => {
+    const [r1, c1] = pos1;
+    const [r2, c2] = pos2;
+}
