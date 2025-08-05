@@ -236,7 +236,7 @@ export const getOptimalPath = (grid, startPos, goalPos) => {
     });
   }
   
-  return []; // No path found
+  return []; // incase no path is found.
 };
 
 /**
