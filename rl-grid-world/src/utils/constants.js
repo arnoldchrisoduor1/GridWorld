@@ -66,3 +66,25 @@ export const RL_PARAMS = {
     STEP: 0.01
   }
 };
+
+// Reward Structure Constants
+export const REWARDS = {
+  DEFAULT: {
+    GOAL: 100,
+    STEP: -1,
+    WALL: -10,
+    OUT_OF_BOUNDS: -10
+  },
+  SPARSE: {
+    GOAL: 1,
+    STEP: 0,
+    WALL: 0,
+    OUT_OF_BOUNDS: 0
+  },
+  DENSE: {
+    GOAL: 100,
+    STEP: -1,
+    WALL: -50,
+    OUT_OF_BOUNDS: -50
+  }
+};
