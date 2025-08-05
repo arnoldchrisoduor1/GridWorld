@@ -88,3 +88,46 @@ export const REWARDS = {
     OUT_OF_BOUNDS: -50
   }
 };
+
+// Training constants.
+export const TRAINING = {
+    MAX_EPISODES: 1000,
+    MAX_STEPS_PER_EPISODE: 200,
+    CONVERGENCE_WINDOW: 50,
+    CONVERGENCE_THRESHOLD: 0.01,
+    ANIMATION_SPEEDS: {
+        SLOW: 1000,
+        MEDIUM: 300,
+        FAST: 100,
+        INSTANT: 0
+    }
+};
+
+// UI CONSTANTS
+export const UI = {
+    CELL_SIZE: 'w-12 h-12',
+    COLORS: {
+        Q_VALUE: {
+            MIN: '#fef2f2', //light red colo
+            MAX: '#dcfce7' //light green
+        },
+        POLICY_ARROW: '#3b82f6'
+    },
+    ANIMATIONS: {
+        CELL_TRANSITION: 'transition-all duration-200',
+        AGENT_MOVE: 'transition-all duration-300 ease-in-out',
+        UI_PANEL: 'transition-all duration-200'
+    }
+};
+
+export const ALGORITHMS = {
+    Q_LEARNING: 'q-learning',
+    SARSA: 'sarsa',
+    EXPECTED_SARSA: 'expected-sarsa'
+};
+
+export const EXPLORATION_STRATEGIES = {
+    EPSILON_GREEDY: 'epsilon-greedy',
+    UCB: 'ucb',
+    BOLTZMAN: 'boltzman'
+};
