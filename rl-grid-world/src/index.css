@@ -39,9 +39,11 @@
   }
 }
 
+/* TODO: need to solve for the ring-opacity */
 
+/* 
 @layer utilities {
     .cell-glow {
         @apply shadow-lg ring-2 ring-blue-400 ring-opacity-50;
     }
-}
+} */
