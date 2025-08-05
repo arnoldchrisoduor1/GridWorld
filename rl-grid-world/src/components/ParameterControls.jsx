@@ -110,6 +110,40 @@ const ParameterControls = ({ qLearning, onClose }) => {
   }, []);
 
   /**
+   * Export parameters to JSON
+   */
+  const exportParameters = useCallback(() => {
+    const dataStr = JSON.stringify(tempParameters, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rl-parameters-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [tempParameters]);
+
+  /**
+   * Import parameters from JSON file
+   */
+  const importParameters = useCallback((event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          setTempParameters(imported);
+          setHasChanges(true);
+        } catch (error) {
+          alert('Invalid parameter file format');
+        }
+      };
+      reader.readAsText(file);
+    }
+  }, []);
+
+  /**
    * Parameter slider component
    */
   const ParameterSlider = ({ 
@@ -338,4 +372,139 @@ const ParameterControls = ({ qLearning, onClose }) => {
                 label="Epsilon Decay"
                 param="epsilonDecay"
                 min={RL_PARAM_RANGES.epsilonDecay.min}
-                max={RL_PARAM_RANGES
+                max={RL_PARAM_RANGES.epsilonDecay.max}
+                step={0.0001}
+                description="Rate at which epsilon decreases over time"
+                formatValue={(v) => v.toFixed(4)}
+              />
+              
+              <ParameterSlider
+                label="Minimum Epsilon"
+                param="minEpsilon"
+                min={0.001}
+                max={0.1}
+                step={0.001}
+                description="Minimum exploration rate to maintain"
+                formatValue={(v) => v.toFixed(3)}
+              />
+              
+              {qLearning.explorationStrategy === EXPLORATION_STRATEGIES.BOLTZMANN && (
+                <ParameterSlider
+                  label="Temperature"
+                  param="temperature"
+                  min={0.1}
+                  max={5.0}
+                  step={0.1}
+                  description="Controls randomness in Boltzmann exploration. Higher = more random"
+                  formatValue={(v) => v.toFixed(1)}
+                />
+              )}
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h4 className="font-semibold text-green-900 mb-2">Exploration Strategy Guide</h4>
+              <div className="text-sm text-green-800 space-y-1">
+                <p><strong>ε-greedy:</strong> Simple random exploration with probability ε</p>
+                <p><strong>UCB:</strong> Optimistic exploration favoring uncertain actions</p>
+                <p><strong>Boltzmann:</strong> Probabilistic selection based on Q-values</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rewards Tab */}
+        {activeTab === 'rewards' && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Reward Structure</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(REWARDS).map(([key, config]) => (
+                <div
+                  key={key}
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    qLearning.rewardStructure === key
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => qLearning.setRewardStructure(key)}
+                >
+                  <h4 className="font-medium text-gray-900 capitalize">{key.replace('_', ' ')}</h4>
+                  <div className="text-xs text-gray-600 mt-2 space-y-1">
+                    <div>Goal: {config.goal}</div>
+                    <div>Step: {config.step}</div>
+                    <div>Wall: {config.wall}</div>
+                    {config.distance && <div>Distance-based rewards</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h4 className="font-semibold text-yellow-900 mb-2">Reward Design Tips</h4>
+              <div className="text-sm text-yellow-800 space-y-1">
+                <p><strong>Default:</strong> Simple sparse rewards, good for basic learning</p>
+                <p><strong>Dense:</strong> More frequent feedback, faster convergence</p>
+                <p><strong>Sparse:</strong> Minimal guidance, requires more exploration</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Presets Tab */}
+        {activeTab === 'presets' && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Parameter Presets</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(parameterPresets).map(([name, preset]) => (
+                <div
+                  key={name}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-gray-300 cursor-pointer transition-all"
+                  onClick={() => loadPreset(name)}
+                >
+                  <h4 className="font-medium text-gray-900 mb-2">{name}</h4>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>α: {preset.learningRate}</div>
+                    <div>γ: {preset.discountFactor}</div>
+                    <div>ε: {preset.epsilon}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={exportParameters}
+                className="control-button bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                <Download className="w-4 h-4" />
+                Export Parameters
+              </button>
+              
+              <label className="control-button bg-green-500 hover:bg-green-600 text-white cursor-pointer">
+                <Upload className="w-4 h-4" />
+                Import Parameters
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importParameters}
+                  className="hidden"
+                />
+              </label>
+              
+              <button
+                onClick={resetToDefaults}
+                className="control-button bg-gray-500 hover:bg-gray-600 text-white"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset to Defaults
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ParameterControls;
