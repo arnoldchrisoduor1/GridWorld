@@ -57,4 +57,14 @@ export const manhattanDistance = (pos1, pos2) => {
 export const euclidianDistance = (pos1, pos2) => {
     const [r1, c1] = pos1;
     const [r2, c2] = pos2;
-}
+    return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(c1 - c2, 2));
+};
+
+// converting 2d positions into 1d state indices.
+export const positionToState = (position, gridSize) => {
+    const [row, col] = position;
+    return row * gridSize + col;
+};
+
+
+// convert 1d state postion to 2d state index
