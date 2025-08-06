@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { useAnimations } from "./AnimationProvider";
 
 export const AnimatedAgent = ({ position, isTraining, recentReward, trail = [] }) => {
   const { getAnimationDuration, animationSettings } = useAnimations();

@@ -21,7 +21,7 @@ function App() {
 
   // Main hooks
   const gridWorld = useGridWorld();
-  const qLearning = useQLearning(gridWorld.gridSize);
+  const qLearning = useQLearning(gridWorld);
   const training = useTraining(gridWorld, qLearning);
 
   // Panel animation variants
@@ -114,7 +114,7 @@ function App() {
               <AnimatedPanel isVisible={true} title="Grid World Environment">
                 <div className="p-4">
                   <GridWorld 
-                    {...gridWorld}
+                    gridHook={gridWorld}  // Pass gridWorld as gridHook prop
                     qTable={qLearning.qTable}
                     policy={qLearning.policy}
                     isTraining={training.isTraining}
@@ -149,7 +149,7 @@ function App() {
                     exit={{ opacity: 0, x: -20 }}
                     className="space-y-4"
                   >
-                    <ControlPanel {...training} />
+                    <ControlPanel training={training} gridWorld={gridWorld} qLearning={qLearning} />
                     <ParameterControls 
                       parameters={qLearning.parameters}
                       updateParameter={qLearning.updateParameter}

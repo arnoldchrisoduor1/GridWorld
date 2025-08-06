@@ -284,7 +284,7 @@ export const updateQTable = (
   
   switch (algorithm) {
     case ALGORITHMS.SARSA:
-      if (nextAction) {
+      if (nextAction != null) {
         return sarsaUpdate(qTable, state, action, reward, nextState, nextAction, params);
       }
       break;
@@ -304,15 +304,28 @@ export const updateQTable = (
  * Get the greedy policy from Q-table
  */
 export const getGreedyPolicy = (qTable, gridSize) => {
-  const policy = Array(gridSize * gridSize).fill(null);
-  
-  for (let state = 0; state < qTable.length; state++) {
-    let bestAction = ACTIONS.UP;
+  // Add this crucial check to handle uninitialized Q-tables
+  if (!qTable || qTable.length === 0) {
+    return []; // Return an empty array or null if the qTable is not ready
+  }
+
+  const numStates = qTable.length;
+  const policy = Array(numStates).fill(null); // Correctly initialize based on qTable length
+
+  for (let state = 0; state < numStates; state++) {
+    const qValues = qTable[state];
+    if (!qValues || qValues.length === 0) {
+      // Handle cases where a specific state has no Q-values (e.g., a wall)
+      policy[state] = null;
+      continue;
+    }
+    
+    let bestAction = null;
     let bestValue = -Infinity;
     
     Object.values(ACTIONS).forEach(action => {
       const actionIndex = actionToIndex(action);
-      const qValue = qTable[state][actionIndex];
+      const qValue = qValues[actionIndex];
       if (qValue > bestValue) {
         bestValue = qValue;
         bestAction = action;

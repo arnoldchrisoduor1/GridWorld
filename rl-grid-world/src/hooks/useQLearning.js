@@ -26,17 +26,49 @@ import {
 } from '../utils/gridUtils.js';
 
 /**
- * Q-Learning algorithm hook with comprehensive training management
+ * Safe access to constants with fallbacks
+ */
+const safeConstants = {
+  ACTIONS: ACTIONS || { UP: 0, DOWN: 1, LEFT: 2, RIGHT: 3 },
+  ALGORITHMS: ALGORITHMS || { Q_LEARNING: 'q-learning', SARSA: 'sarsa', EXPECTED_SARSA: 'expected-sarsa' },
+  EXPLORATION_STRATEGIES: EXPLORATION_STRATEGIES || { EPSILON_GREEDY: 'epsilon-greedy' },
+  RL_PARAMS: RL_PARAMS || {
+    learningRate: 0.1,
+    discountFactor: 0.9,
+    epsilon: 0.1,
+    epsilonDecay: 0.001,
+    minEpsilon: 0.01,
+    temperature: 1.0,
+    ucbC: 2.0
+  },
+  REWARDS: REWARDS || { DEFAULT: { goal: 100, step: -1, wall: -10 } },
+  TRAINING: TRAINING || {
+    CONVERGENCE_THRESHOLD: 0.001,
+    CONVERGENCE_WINDOW: 10
+  }
+};
+
+/**
+ * Q-Learning algorithm hook with comprehensive training management and safety checks
  */
 export const useQLearning = (gridWorld) => {
+  // Safely access gridWorld properties with fallbacks
+  const safeGridWorld = useMemo(() => ({
+    grid: gridWorld?.grid || null,
+    gridSize: gridWorld?.gridSize || 5,
+    startPos: gridWorld?.startPos || null,
+    goalPos: gridWorld?.goalPos || null,
+    ...gridWorld
+  }), [gridWorld]);
+
   // Core Q-Learning State
   const [qTable, setQTable] = useState({});
-  const [algorithm, setAlgorithm] = useState(ALGORITHMS.Q_LEARNING);
-  const [explorationStrategy, setExplorationStrategy] = useState(EXPLORATION_STRATEGIES.EPSILON_GREEDY);
+  const [algorithm, setAlgorithm] = useState(safeConstants.ALGORITHMS.Q_LEARNING);
+  const [explorationStrategy, setExplorationStrategy] = useState(safeConstants.EXPLORATION_STRATEGIES.EPSILON_GREEDY);
   
-  // RL Parameters
-  const [parameters, setParameters] = useState(RL_PARAMS);
-  const [rewardStructure, setRewardStructure] = useState(REWARDS.DEFAULT);
+  // RL Parameters with safe defaults
+  const [parameters, setParameters] = useState(safeConstants.RL_PARAMS);
+  const [rewardStructure, setRewardStructure] = useState(safeConstants.REWARDS.DEFAULT);
   
   // Training State
   const [isInitialized, setIsInitialized] = useState(false);
@@ -55,290 +87,487 @@ export const useQLearning = (gridWorld) => {
   });
 
   /**
+   * Safe utility function calls with error handling
+   */
+  const safeUtilCall = useCallback((fn, fallback, ...args) => {
+    try {
+      if (typeof fn === 'function') {
+        return fn(...args);
+      }
+      console.warn('Function not available, using fallback');
+      return fallback;
+    } catch (error) {
+      console.error('Utility function error:', error);
+      return fallback;
+    }
+  }, []);
+
+  /**
    * Initialize Q-table for current grid configuration
    */
   const initializeQLearning = useCallback(() => {
-    if (!gridWorld.grid || !gridWorld.startPos || !gridWorld.goalPos) {
-      console.warn('Cannot initialize Q-learning: incomplete grid configuration');
-      return;
+    try {
+      if (!safeGridWorld.grid || !safeGridWorld.startPos || !safeGridWorld.goalPos) {
+        console.warn('Cannot initialize Q-learning: incomplete grid configuration', {
+          hasGrid: !!safeGridWorld.grid,
+          hasStartPos: !!safeGridWorld.startPos,
+          hasGoalPos: !!safeGridWorld.goalPos
+        });
+        return false;
+      }
+
+      const newQTable = safeUtilCall(
+        initializeQTable,
+        {},
+        safeGridWorld.gridSize,
+        Object.values(safeConstants.ACTIONS)
+      );
+
+      if (Object.keys(newQTable).length === 0) {
+        console.error('Failed to initialize Q-table');
+        return false;
+      }
+
+      setQTable(newQTable);
+      setIsInitialized(true);
+      setTotalSteps(0);
+      setConvergenceInfo({
+        isConverged: false,
+        stableEpisodes: 0,
+        convergenceValue: 0
+      });
+
+      console.log(`Q-learning initialized: ${safeGridWorld.gridSize}×${safeGridWorld.gridSize} grid, ` +
+                  `${Object.keys(newQTable).length} states`);
+      return true;
+    } catch (error) {
+      console.error('Error initializing Q-learning:', error);
+      setIsInitialized(false);
+      return false;
     }
-
-    const newQTable = initializeQTable(
-      gridWorld.gridSize,
-      Object.values(ACTIONS)
-    );
-
-    setQTable(newQTable);
-    setIsInitialized(true);
-    setTotalSteps(0);
-    setConvergenceInfo({
-      isConverged: false,
-      stableEpisodes: 0,
-      convergenceValue: 0
-    });
-
-    console.log(`Q-learning initialized: ${gridWorld.gridSize}×${gridWorld.gridSize} grid, ` +
-                `${Object.keys(newQTable).length} states`);
-  }, [gridWorld.grid, gridWorld.gridSize, gridWorld.startPos, gridWorld.goalPos]);
+  }, [safeGridWorld.grid, safeGridWorld.gridSize, safeGridWorld.startPos, safeGridWorld.goalPos, safeUtilCall]);
 
   /**
    * Update RL parameters with validation
    */
   const updateParameters = useCallback((newParams) => {
-    const validatedParams = {
-      ...parameters,
-      ...newParams,
-      // Ensure parameters stay within valid ranges
-      learningRate: Math.max(0.001, Math.min(1.0, newParams.learningRate || parameters.learningRate)),
-      discountFactor: Math.max(0.0, Math.min(1.0, newParams.discountFactor || parameters.discountFactor)),
-      epsilon: Math.max(0.0, Math.min(1.0, newParams.epsilon || parameters.epsilon)),
-      epsilonDecay: Math.max(0.001, Math.min(0.1, newParams.epsilonDecay || parameters.epsilonDecay)),
-      minEpsilon: Math.max(0.0, Math.min(0.5, newParams.minEpsilon || parameters.minEpsilon))
-    };
+    try {
+      if (!newParams || typeof newParams !== 'object') {
+        console.warn('Invalid parameters provided');
+        return;
+      }
 
-    setParameters(validatedParams);
+      const validatedParams = {
+        ...parameters,
+        ...newParams,
+        // Ensure parameters stay within valid ranges
+        learningRate: Math.max(0.001, Math.min(1.0, newParams.learningRate ?? parameters.learningRate)),
+        discountFactor: Math.max(0.0, Math.min(1.0, newParams.discountFactor ?? parameters.discountFactor)),
+        epsilon: Math.max(0.0, Math.min(1.0, newParams.epsilon ?? parameters.epsilon)),
+        epsilonDecay: Math.max(0.001, Math.min(0.1, newParams.epsilonDecay ?? parameters.epsilonDecay)),
+        minEpsilon: Math.max(0.0, Math.min(0.5, newParams.minEpsilon ?? parameters.minEpsilon)),
+        temperature: Math.max(0.1, newParams.temperature ?? parameters.temperature ?? 1.0),
+        ucbC: Math.max(0.1, newParams.ucbC ?? parameters.ucbC ?? 2.0)
+      };
+
+      setParameters(validatedParams);
+    } catch (error) {
+      console.error('Error updating parameters:', error);
+    }
   }, [parameters]);
 
   /**
    * Execute a single step in the environment
    */
   const executeStep = useCallback((currentState, action) => {
-    const currentPos = stateToPosition(currentState, gridWorld.gridSize);
-    const nextPos = getNextPosition(currentPos, action);
-    
-    // Check if move is valid
-    const isValidMove = isValidPosition(nextPos, gridWorld.gridSize) && 
-                       !isWall(gridWorld.grid, nextPos[0], nextPos[1]);
-    
-    const nextPosition = isValidMove ? nextPos : currentPos;
-    const nextState = positionToState(nextPosition, gridWorld.gridSize);
-    
-    // Calculate reward
-    const reward = calculateReward(
-      currentPos,
-      nextPosition,
-      gridWorld.goalPos,
-      gridWorld.grid,
-      rewardStructure,
-      !isValidMove // collision penalty
-    );
-    
-    // Check if episode is done
-    const isDone = positionsEqual(nextPosition, gridWorld.goalPos);
-    
-    return {
-      nextState,
-      nextPosition,
-      reward,
-      isDone,
-      collision: !isValidMove
-    };
-  }, [gridWorld.grid, gridWorld.gridSize, gridWorld.goalPos, rewardStructure]);
+    try {
+      if (currentState == null || action == null) {
+        console.warn('Invalid state or action provided to executeStep');
+        return {
+          nextState: currentState,
+          nextPosition: [0, 0],
+          reward: 0,
+          isDone: false,
+          collision: true
+        };
+      }
+
+      const currentPos = safeUtilCall(
+        stateToPosition,
+        [0, 0],
+        currentState,
+        safeGridWorld.gridSize
+      );
+
+      const nextPos = safeUtilCall(
+        getNextPosition,
+        currentPos,
+        currentPos,
+        action
+      );
+      
+      // Check if move is valid
+      const isValidMove = safeUtilCall(isValidPosition, false, nextPos, safeGridWorld.gridSize) && 
+                         !safeUtilCall(isWall, false, safeGridWorld.grid, nextPos[0], nextPos[1]);
+      
+      const nextPosition = isValidMove ? nextPos : currentPos;
+      const nextState = safeUtilCall(
+        positionToState,
+        currentState,
+        nextPosition,
+        safeGridWorld.gridSize
+      );
+      
+      // Calculate reward
+      const reward = safeUtilCall(
+        calculateReward,
+        0,
+        currentPos,
+        nextPosition,
+        safeGridWorld.goalPos,
+        safeGridWorld.grid,
+        rewardStructure,
+        !isValidMove // collision penalty
+      );
+      
+      // Check if episode is done
+      const isDone = safeUtilCall(
+        positionsEqual,
+        false,
+        nextPosition,
+        safeGridWorld.goalPos
+      );
+      
+      return {
+        nextState,
+        nextPosition,
+        reward,
+        isDone,
+        collision: !isValidMove
+      };
+    } catch (error) {
+      console.error('Error in executeStep:', error);
+      return {
+        nextState: currentState,
+        nextPosition: [0, 0],
+        reward: 0,
+        isDone: false,
+        collision: true
+      };
+    }
+  }, [safeGridWorld.grid, safeGridWorld.gridSize, safeGridWorld.goalPos, rewardStructure, safeUtilCall]);
 
   /**
    * Perform Q-value update based on selected algorithm
    */
   const performUpdate = useCallback((state, action, reward, nextState, isDone) => {
-    setQTable(prevQTable => {
-      const newQTable = { ...prevQTable };
-      
-      switch (algorithm) {
-        case ALGORITHMS.Q_LEARNING:
-          updateQTable(
-            newQTable,
-            state,
-            action,
-            reward,
-            nextState,
-            parameters.learningRate,
-            parameters.discountFactor,
-            isDone,
-            'q-learning'
-          );
-          break;
-          
-        case ALGORITHMS.SARSA:
-          // For SARSA, we need the next action (this would be passed from training loop)
-          updateQTable(
-            newQTable,
-            state,
-            action,
-            reward,
-            nextState,
-            parameters.learningRate,
-            parameters.discountFactor,
-            isDone,
-            'sarsa'
-          );
-          break;
-          
-        case ALGORITHMS.EXPECTED_SARSA:
-          updateQTable(
-            newQTable,
-            state,
-            action,
-            reward,
-            nextState,
-            parameters.learningRate,
-            parameters.discountFactor,
-            isDone,
-            'expected-sarsa',
-            { epsilon: parameters.epsilon }
-          );
-          break;
-          
-        default:
-          console.warn(`Unknown algorithm: ${algorithm}`);
+    try {
+      if (state == null || action == null) {
+        console.warn('Invalid parameters for performUpdate');
+        return;
       }
+
+      setQTable(prevQTable => {
+        const newQTable = { ...prevQTable };
+        
+        // Ensure state exists in Q-table
+        if (!newQTable[state]) {
+          newQTable[state] = {};
+          Object.values(safeConstants.ACTIONS).forEach(a => {
+            newQTable[state][a] = 0;
+          });
+        }
+        
+        try {
+          switch (algorithm) {
+            case safeConstants.ALGORITHMS.Q_LEARNING:
+              safeUtilCall(
+                updateQTable,
+                null,
+                newQTable,
+                state,
+                action,
+                reward || 0,
+                nextState,
+                parameters.learningRate,
+                parameters.discountFactor,
+                isDone,
+                { ...parameters, algorithm: 'q-learning' }
+              );
+              break;
+              
+            case safeConstants.ALGORITHMS.SARSA:
+              safeUtilCall(
+                updateQTable,
+                null,
+                newQTable,
+                state,
+                action,
+                reward || 0,
+                nextState,
+                parameters.learningRate,
+                parameters.discountFactor,
+                isDone,
+                { ...parameters, algorithm: 'sarsa' }
+              );
+              break;
+              
+            case safeConstants.ALGORITHMS.EXPECTED_SARSA:
+              safeUtilCall(
+                updateQTable,
+                null,
+                newQTable,
+                state,
+                action,
+                reward || 0,
+                nextState,
+                parameters.learningRate,
+                parameters.discountFactor,
+                isDone,
+                { ...parameters, algorithm: 'expected-sarsa' },
+                { epsilon: parameters.epsilon }
+              );
+              break;
+              
+            default:
+              console.warn(`Unknown algorithm: ${algorithm}`);
+          }
+        } catch (updateError) {
+          console.error('Error updating Q-table:', updateError);
+        }
+        
+        return newQTable;
+      });
       
-      return newQTable;
-    });
-    
-    setTotalSteps(prev => prev + 1);
-    performanceRef.current.updateCount++;
-  }, [algorithm, parameters]);
+      setTotalSteps(prev => prev + 1);
+      performanceRef.current.updateCount++;
+    } catch (error) {
+      console.error('Error in performUpdate:', error);
+    }
+  }, [algorithm, parameters, safeUtilCall]);
 
   /**
    * Select action based on current exploration strategy
    */
-  const selectActionForState = useCallback((state, validActions = Object.values(ACTIONS)) => {
-    if (!qTable[state]) {
-      // Random action for unvisited states
-      return validActions[Math.floor(Math.random() * validActions.length)];
-    }
-
-    return selectAction(
-      qTable,
-      state,
-      validActions,
-      explorationStrategy,
-      {
-        epsilon: parameters.epsilon,
-        temperature: parameters.temperature || 1.0,
-        c: parameters.ucbC || 2.0
+  const selectActionForState = useCallback((state, validActions = Object.values(safeConstants.ACTIONS)) => {
+    try {
+      if (state == null) {
+        console.warn('Invalid state provided to selectActionForState');
+        return validActions[0] || safeConstants.ACTIONS.UP;
       }
-    );
-  }, [qTable, explorationStrategy, parameters]);
+
+      if (!qTable[state] || Object.keys(qTable[state]).length === 0) {
+        // Random action for unvisited states
+        return validActions[Math.floor(Math.random() * validActions.length)];
+      }
+
+      return safeUtilCall(
+        selectAction,
+        validActions[Math.floor(Math.random() * validActions.length)],
+        qTable,
+        state,
+        validActions,
+        explorationStrategy,
+        {
+          epsilon: parameters.epsilon,
+          temperature: parameters.temperature || 1.0,
+          c: parameters.ucbC || 2.0
+        }
+      );
+    } catch (error) {
+      console.error('Error in selectActionForState:', error);
+      return Object.values(safeConstants.ACTIONS)[0];
+    }
+  }, [qTable, explorationStrategy, parameters, safeUtilCall]);
 
   /**
    * Get Q-values for visualization
    */
   const getQValues = useCallback((state) => {
-    return qTable[state] || {};
+    try {
+      return qTable[state] || {};
+    } catch (error) {
+      console.error('Error getting Q-values:', error);
+      return {};
+    }
   }, [qTable]);
 
   /**
    * Get current policy (greedy action for each state)
    */
   const getCurrentPolicy = useMemo(() => {
-    if (!isInitialized || Object.keys(qTable).length === 0) {
-      return {};
-    }
+    try {
+      if (!isInitialized || !qTable || qTable.length === 0) {
+        return [];
+      }
 
-    return getGreedyPolicy(qTable, Object.values(ACTIONS));
-  }, [qTable, isInitialized]);
+      return safeUtilCall(
+        getGreedyPolicy,
+        [],
+        qTable,
+        safeGridWorld.gridSize
+      );
+    } catch (error) {
+      console.error('Error getting current policy:', error);
+      return [];
+    }
+  }, [qTable, isInitialized, safeGridWorld.gridSize, safeUtilCall]);
 
   /**
    * Get state value function (max Q-value for each state)
    */
   const getStateValues = useMemo(() => {
-    const stateValues = {};
-    
-    Object.keys(qTable).forEach(state => {
-      const qValues = qTable[state];
-      stateValues[state] = Math.max(...Object.values(qValues));
-    });
-    
-    return stateValues;
+    try {
+      const stateValues = {};
+      
+      Object.keys(qTable).forEach(state => {
+        const qValues = qTable[state];
+        if (qValues && typeof qValues === 'object') {
+          const values = Object.values(qValues).filter(v => typeof v === 'number');
+          stateValues[state] = values.length > 0 ? Math.max(...values) : 0;
+        } else {
+          stateValues[state] = 0;
+        }
+      });
+      
+      return stateValues;
+    } catch (error) {
+      console.error('Error computing state values:', error);
+      return {};
+    }
   }, [qTable]);
 
   /**
    * Check for convergence periodically
    */
   const checkForConvergence = useCallback(() => {
-    if (performanceRef.current.updateCount - performanceRef.current.lastConvergenceCheck < 100) {
-      return; // Check every 100 updates
+    try {
+      if (performanceRef.current.updateCount - performanceRef.current.lastConvergenceCheck < 100) {
+        return; // Check every 100 updates
+      }
+
+      const convergenceResult = safeUtilCall(
+        checkConvergence,
+        { isConverged: false, convergenceValue: 0 },
+        qTable,
+        safeConstants.TRAINING.CONVERGENCE_THRESHOLD,
+        safeConstants.TRAINING.CONVERGENCE_WINDOW
+      );
+
+      setConvergenceInfo(prev => ({
+        ...convergenceResult,
+        stableEpisodes: convergenceResult.isConverged ? prev.stableEpisodes + 1 : 0
+      }));
+
+      performanceRef.current.lastConvergenceCheck = performanceRef.current.updateCount;
+    } catch (error) {
+      console.error('Error checking convergence:', error);
     }
-
-    const convergenceResult = checkConvergence(
-      qTable,
-      TRAINING.CONVERGENCE_THRESHOLD,
-      TRAINING.CONVERGENCE_WINDOW
-    );
-
-    setConvergenceInfo(prev => ({
-      ...convergenceResult,
-      stableEpisodes: convergenceResult.isConverged ? prev.stableEpisodes + 1 : 0
-    }));
-
-    performanceRef.current.lastConvergenceCheck = performanceRef.current.updateCount;
-  }, [qTable]);
+  }, [qTable, safeUtilCall]);
 
   /**
    * Reset Q-learning to initial state
    */
   const reset = useCallback(() => {
-    setQTable({});
-    setIsInitialized(false);
-    setTotalSteps(0);
-    setConvergenceInfo({
-      isConverged: false,
-      stableEpisodes: 0,
-      convergenceValue: 0
-    });
-    performanceRef.current = {
-      lastQTableHash: null,
-      updateCount: 0,
-      lastConvergenceCheck: 0
-    };
+    try {
+      setQTable({});
+      setIsInitialized(false);
+      setTotalSteps(0);
+      setConvergenceInfo({
+        isConverged: false,
+        stableEpisodes: 0,
+        convergenceValue: 0
+      });
+      performanceRef.current = {
+        lastQTableHash: null,
+        updateCount: 0,
+        lastConvergenceCheck: 0
+      };
+    } catch (error) {
+      console.error('Error resetting Q-learning:', error);
+    }
   }, []);
 
   /**
    * Get training statistics
    */
   const getTrainingStats = useMemo(() => {
-    return {
-      totalSteps,
-      totalStates: Object.keys(qTable).length,
-      exploredStates: Object.keys(qTable).filter(state => 
-        Object.values(qTable[state]).some(value => value !== 0)
-      ).length,
-      convergenceInfo,
-      parameters,
-      algorithm,
-      explorationStrategy
-    };
+    try {
+      return {
+        totalSteps,
+        totalStates: Object.keys(qTable).length,
+        exploredStates: Object.keys(qTable).filter(state => {
+          const stateValues = qTable[state];
+          return stateValues && Object.values(stateValues).some(value => 
+            typeof value === 'number' && value !== 0
+          );
+        }).length,
+        convergenceInfo,
+        parameters,
+        algorithm,
+        explorationStrategy
+      };
+    } catch (error) {
+      console.error('Error getting training stats:', error);
+      return {
+        totalSteps: 0,
+        totalStates: 0,
+        exploredStates: 0,
+        convergenceInfo: { isConverged: false, stableEpisodes: 0, convergenceValue: 0 },
+        parameters: safeConstants.RL_PARAMS,
+        algorithm: safeConstants.ALGORITHMS.Q_LEARNING,
+        explorationStrategy: safeConstants.EXPLORATION_STRATEGIES.EPSILON_GREEDY
+      };
+    }
   }, [totalSteps, qTable, convergenceInfo, parameters, algorithm, explorationStrategy]);
 
   /**
    * Export Q-table and configuration
    */
   const exportConfiguration = useCallback(() => {
-    return {
-      qTable,
-      parameters,
-      algorithm,
-      explorationStrategy,
-      rewardStructure,
-      trainingStats: getTrainingStats,
-      gridConfig: {
-        size: gridWorld.gridSize,
-        startPos: gridWorld.startPos,
-        goalPos: gridWorld.goalPos
-      }
-    };
-  }, [qTable, parameters, algorithm, explorationStrategy, rewardStructure, getTrainingStats, gridWorld]);
+    try {
+      return {
+        qTable,
+        parameters,
+        algorithm,
+        explorationStrategy,
+        rewardStructure,
+        trainingStats: getTrainingStats,
+        gridConfig: {
+          size: safeGridWorld.gridSize,
+          startPos: safeGridWorld.startPos,
+          goalPos: safeGridWorld.goalPos
+        }
+      };
+    } catch (error) {
+      console.error('Error exporting configuration:', error);
+      return {
+        qTable: {},
+        parameters: safeConstants.RL_PARAMS,
+        algorithm: safeConstants.ALGORITHMS.Q_LEARNING,
+        explorationStrategy: safeConstants.EXPLORATION_STRATEGIES.EPSILON_GREEDY,
+        rewardStructure: safeConstants.REWARDS.DEFAULT,
+        trainingStats: getTrainingStats,
+        gridConfig: { size: 5, startPos: null, goalPos: null }
+      };
+    }
+  }, [qTable, parameters, algorithm, explorationStrategy, rewardStructure, getTrainingStats, safeGridWorld]);
 
   /**
    * Import Q-table and configuration
    */
   const importConfiguration = useCallback((config) => {
     try {
+      if (!config || typeof config !== 'object') {
+        console.error('Invalid configuration provided');
+        return false;
+      }
+
       setQTable(config.qTable || {});
-      setParameters(config.parameters || RL_PARAMS);
-      setAlgorithm(config.algorithm || ALGORITHMS.Q_LEARNING);
-      setExplorationStrategy(config.explorationStrategy || EXPLORATION_STRATEGIES.EPSILON_GREEDY);
-      setRewardStructure(config.rewardStructure || REWARDS.DEFAULT);
+      setParameters(config.parameters || safeConstants.RL_PARAMS);
+      setAlgorithm(config.algorithm || safeConstants.ALGORITHMS.Q_LEARNING);
+      setExplorationStrategy(config.explorationStrategy || safeConstants.EXPLORATION_STRATEGIES.EPSILON_GREEDY);
+      setRewardStructure(config.rewardStructure || safeConstants.REWARDS.DEFAULT);
       setIsInitialized(Object.keys(config.qTable || {}).length > 0);
       
       console.log('Q-learning configuration imported successfully');
@@ -351,15 +580,26 @@ export const useQLearning = (gridWorld) => {
 
   // Auto-initialize when grid changes
   useEffect(() => {
-    if (gridWorld.grid && gridWorld.startPos && gridWorld.goalPos && !isInitialized) {
-      initializeQLearning();
+    try {
+      if (safeGridWorld.grid && safeGridWorld.startPos && safeGridWorld.goalPos && !isInitialized) {
+        const success = initializeQLearning();
+        if (!success) {
+          console.warn('Auto-initialization failed');
+        }
+      }
+    } catch (error) {
+      console.error('Error in auto-initialization effect:', error);
     }
-  }, [gridWorld.grid, gridWorld.startPos, gridWorld.goalPos, isInitialized, initializeQLearning]);
+  }, [safeGridWorld.grid, safeGridWorld.startPos, safeGridWorld.goalPos, isInitialized, initializeQLearning]);
 
   // Periodic convergence checking
   useEffect(() => {
-    if (isInitialized && totalSteps > 0) {
-      checkForConvergence();
+    try {
+      if (isInitialized && totalSteps > 0) {
+        checkForConvergence();
+      }
+    } catch (error) {
+      console.error('Error in convergence checking effect:', error);
     }
   }, [totalSteps, isInitialized, checkForConvergence]);
 
@@ -383,8 +623,20 @@ export const useQLearning = (gridWorld) => {
     performUpdate,
     selectActionForState,
     updateParameters,
-    setAlgorithm,
-    setExplorationStrategy,
+    setAlgorithm: (alg) => {
+      if (Object.values(safeConstants.ALGORITHMS).includes(alg)) {
+        setAlgorithm(alg);
+      } else {
+        console.warn(`Invalid algorithm: ${alg}`);
+      }
+    },
+    setExplorationStrategy: (strategy) => {
+      if (Object.values(safeConstants.EXPLORATION_STRATEGIES).includes(strategy)) {
+        setExplorationStrategy(strategy);
+      } else {
+        console.warn(`Invalid exploration strategy: ${strategy}`);
+      }
+    },
     setRewardStructure,
     reset,
     

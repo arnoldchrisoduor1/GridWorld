@@ -100,13 +100,13 @@ const MetricsPanel = ({
       averageSteps: Math.round(averageSteps * 100) / 100,
       averageReward: Math.round(averageReward * 100) / 100,
       convergenceRate: Math.max(0, Math.round(convergenceRate * 100) / 100),
-      explorationRate: qLearning.parameters.epsilon,
+      explorationRate: qLearning?.parameters?.epsilon ?? 0,
       successRate: Math.round(successRate * 100) / 100,
       bestEpisode,
       recentPerformance,
       convergenceEpisode
     };
-  }, [episodes, qLearning.parameters.epsilon]);
+  }, [episodes, qLearning?.parameters?.epsilon]);
 
   /**
    * Q-table statistics

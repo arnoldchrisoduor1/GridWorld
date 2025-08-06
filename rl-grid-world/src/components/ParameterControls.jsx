@@ -25,12 +25,17 @@ import {
  * Advanced parameter controls for RL algorithms
  */
 const ParameterControls = ({ qLearning, onClose }) => {
+  if (!qLearning || !qLearning.parameters) {
+    return null;
+  }
+
+  
   const [activeTab, setActiveTab] = useState('algorithm');
   const [tempParameters, setTempParameters] = useState(qLearning.parameters);
   const [hasChanges, setHasChanges] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [showPresets, setShowPresets] = useState(false);
-
+  
   /**
    * Parameter presets for different scenarios
    */

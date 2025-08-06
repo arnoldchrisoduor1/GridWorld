@@ -1,3 +1,6 @@
+import { useAnimations } from "./AnimationProvider";
+import { AnimatePresence, motion } from "framer-motion";
+
 export const AnimatedPanel = ({ children, isVisible, title, className = "" }) => {
   const { getAnimationDuration, animationSettings } = useAnimations();
 

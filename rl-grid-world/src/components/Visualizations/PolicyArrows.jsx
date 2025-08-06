@@ -322,116 +322,113 @@ const PolicyArrows = ({
       )}
 
       {/* Grid Overlay */}
-      <div className="relative">
-        <div 
-          className="grid gap-0 border border-gray-300 bg-transparent rounded-lg overflow-hidden"
-          style={{ 
-            gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-            aspectRatio: '1'
-          }}
-        >
-          {grid.map((row, rowIndex) =>
-            row.map((cell, colIndex) => {
-              const policyData = policy[`${rowIndex}-${colIndex}`];
-              const cellType = grid[rowIndex][colIndex];
-              
-              // Don't show arrows on walls or special cells
-              if (cellType === CELL_TYPES.WALL || 
-                  (rowIndex === startPos[0] && colIndex === startPos[1]) ||
-                  (rowIndex === goalPos[0] && colIndex === goalPos[1])) {
-                return (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className="aspect-square"
-                  />
-                );
-              }
+      {Array.isArray(grid) && (
+  <div className="relative">
+    <div 
+      className="grid gap-0 border border-gray-300 bg-transparent rounded-lg overflow-hidden"
+      style={{ 
+        gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
+        aspectRatio: '1'
+      }}
+    >
+      {grid.map((row, rowIndex) =>
+        row.map((cell, colIndex) => {
+          const cellType = grid[rowIndex][colIndex];
+          const policyData = policy?.[`${rowIndex}-${colIndex}`];
 
-              // Don't show if no policy or confidence too low
-              if (!policyData || policyData.confidence < localSettings.minConfidence) {
-                return (
-                  <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className="aspect-square flex items-center justify-center"
-                  >
-                    {policyData && policyData.confidence < localSettings.minConfidence && (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full opacity-50" />
-                    )}
-                  </div>
-                );
-              }
+          // Don't show arrows on walls or special cells
+          if (
+            cellType === CELL_TYPES.WALL ||
+            (startPos && rowIndex === startPos[0] && colIndex === startPos[1]) ||
+            (goalPos && rowIndex === goalPos[0] && colIndex === goalPos[1])
+          ) {
+            return (
+              <div
+                key={`${rowIndex}-${colIndex}`}
+                className="aspect-square"
+              />
+            );
+          }
 
-              const { bestAction, bestValue, confidence } = policyData;
-              const arrowSize = getArrowSize(confidence);
-              const arrowColor = getArrowColor(confidence, bestValue);
-              const opacity = localSettings.transparentWeak ? (0.3 + confidence * 0.7) : 1;
+          // Don't show if no policy or confidence too low
+          if (!policyData || policyData.confidence < localSettings.minConfidence) {
+            return (
+              <div
+                key={`${rowIndex}-${colIndex}`}
+                className="aspect-square flex items-center justify-center"
+              >
+                {policyData && policyData.confidence < localSettings.minConfidence && (
+                  <div className="w-2 h-2 bg-gray-300 rounded-full opacity-50" />
+                )}
+              </div>
+            );
+          }
 
-              return (
-                <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`aspect-square flex flex-col items-center justify-center relative ${
-                    localSettings.animateArrows ? 'transition-all duration-300' : ''
-                  }`}
-                  style={{ opacity }}
-                >
-                  {/* Arrow */}
+          const { bestAction, bestValue, confidence } = policyData;
+          const arrowSize = getArrowSize(confidence);
+          const arrowColor = getArrowColor(confidence, bestValue);
+          const opacity = localSettings.transparentWeak ? (0.3 + confidence * 0.7) : 1;
+
+          return (
+            <div
+              key={`${rowIndex}-${colIndex}`}
+              className={`aspect-square flex flex-col items-center justify-center relative ${
+                localSettings.animateArrows ? 'transition-all duration-300' : ''
+              }`}
+              style={{ opacity }}
+            >
+              {/* Arrow */}
+              <div 
+                className={`flex items-center justify-center ${
+                  localSettings.animateArrows ? 'hover:scale-110 transition-transform' : ''
+                }`}
+                style={{ color: arrowColor }}
+              >
+                {localSettings.arrowStyle === 'modern' && getArrowIcon(bestAction, arrowSize)}
+                {['classic', 'symbols'].includes(localSettings.arrowStyle) && (
                   <div 
-                    className={`flex items-center justify-center ${
-                      localSettings.animateArrows ? 'hover:scale-110 transition-transform' : ''
-                    }`}
-                    style={{ color: arrowColor }}
+                    className="font-bold"
+                    style={{ fontSize: `${arrowSize}px` }}
                   >
-                    {localSettings.arrowStyle === 'modern' && getArrowIcon(bestAction, arrowSize)}
-                    {localSettings.arrowStyle === 'classic' && (
-                      <div 
-                        className="font-bold"
-                        style={{ fontSize: `${arrowSize}px` }}
-                      >
-                        {ACTION_SYMBOLS[bestAction]}
-                      </div>
-                    )}
-                    {localSettings.arrowStyle === 'symbols' && (
-                      <div 
-                        className="font-bold"
-                        style={{ fontSize: `${arrowSize}px` }}
-                      >
-                        {ACTION_SYMBOLS[bestAction]}
-                      </div>
-                    )}
+                    {ACTION_SYMBOLS[bestAction]}
                   </div>
+                )}
+              </div>
 
-                  {/* Q-Value Display */}
-                  {localSettings.showValues && (
-                    <div 
-                      className="text-xs font-medium mt-1"
-                      style={{ color: arrowColor, fontSize: `${Math.max(8, arrowSize * 0.4)}px` }}
-                    >
-                      {bestValue.toFixed(1)}
-                    </div>
-                  )}
-
-                  {/* Confidence Indicator */}
-                  {localSettings.showConfidence && (
-                    <div 
-                      className="absolute bottom-0 right-0 w-2 h-2 rounded-full"
-                      style={{ 
-                        backgroundColor: arrowColor,
-                        transform: `scale(${confidence})`,
-                        opacity: confidence
-                      }}
-                    />
-                  )}
-
-                  {/* Agent Position Highlight */}
-                  {agentPos && agentPos[0] === rowIndex && agentPos[1] === colIndex && (
-                    <div className="absolute inset-0 border-2 border-blue-500 rounded animate-pulse" />
-                  )}
+              {/* Q-Value Display */}
+              {localSettings.showValues && (
+                <div 
+                  className="text-xs font-medium mt-1"
+                  style={{ color: arrowColor, fontSize: `${Math.max(8, arrowSize * 0.4)}px` }}
+                >
+                  {bestValue.toFixed(1)}
                 </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+              )}
+
+              {/* Confidence Indicator */}
+              {localSettings.showConfidence && (
+                <div 
+                  className="absolute bottom-0 right-0 w-2 h-2 rounded-full"
+                  style={{ 
+                    backgroundColor: arrowColor,
+                    transform: `scale(${confidence})`,
+                    opacity: confidence
+                  }}
+                />
+              )}
+
+              {/* Agent Position Highlight */}
+              {agentPos && agentPos[0] === rowIndex && agentPos[1] === colIndex && (
+                <div className="absolute inset-0 border-2 border-blue-500 rounded animate-pulse" />
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  </div>
+)}
+
 
       {/* Policy Statistics */}
       <div className="mt-4 p-3 bg-gray-50 rounded-lg">

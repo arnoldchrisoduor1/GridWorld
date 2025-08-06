@@ -1,3 +1,6 @@
+import { useAnimations } from "./AnimationProvider";
+import { AnimatedPanel } from "./AnimatedPanel";
+
 export const AnimationControls = () => {
   const { animationSettings, setAnimationSettings } = useAnimations();
 

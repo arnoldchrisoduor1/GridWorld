@@ -224,34 +224,37 @@ export const useTraining = (gridWorld, qLearning) => {
   /**
    * Start training process
    */
-  const startTraining = useCallback(() => {
-    if (!qLearning.isInitialized) {
-      console.warn('Cannot start training: Q-learning not initialized');
-      return false;
+ // Inside useTraining.js
+const startTraining = useCallback(() => {
+    // 1. Always attempt to initialize if not already training.
+    if (!isTraining) {
+        const initializationSuccess = initializeTraining();
+        if (!initializationSuccess) {
+            console.warn('Initialization failed, cannot start training.');
+            return false;
+        }
     }
 
-    if (!isTraining) {
-      if (!initializeTraining()) return false;
-    }
-    
+    // 2. Set training state to true immediately after successful initialization.
     setIsTraining(true);
     setIsPaused(false);
-    
-    // Start training loop
+
+    // 3. Define the training loop
     const runTrainingLoop = () => {
-      if (!isTraining || isPaused) return;
-      
-      const episodeCompleted = executeTrainingStep();
-      
-      if (!episodeCompleted && isTraining && !isPaused) {
-        trainingRef.current.intervalId = setTimeout(runTrainingLoop, trainingSpeed);
-      }
+        if (!isTraining || isPaused) return;
+
+        const episodeCompleted = executeTrainingStep();
+
+        if (!episodeCompleted && isTraining && !isPaused) {
+            trainingRef.current.intervalId = setTimeout(runTrainingLoop, trainingSpeed);
+        }
     };
     
+    // 4. Start the loop.
     runTrainingLoop();
     console.log('Training started');
     return true;
-  }, [qLearning.isInitialized, isTraining, initializeTraining, isPaused, executeTrainingStep, trainingSpeed]);
+}, [isTraining, initializeTraining, isPaused, executeTrainingStep, trainingSpeed]);
 
   /**
    * Pause training

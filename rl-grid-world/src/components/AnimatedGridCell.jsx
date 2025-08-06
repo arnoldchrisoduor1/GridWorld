@@ -1,6 +1,6 @@
 // AnimatedGridCell.jsx - Enhanced GridCell with animations
 import React, { memo, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useAnimations } from './AnimationProvider.jsx';
 import { CELL_TYPES } from '../utils/constants.js';
 
