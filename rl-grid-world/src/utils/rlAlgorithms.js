@@ -272,14 +272,19 @@ export const expectedSarsaUpdate = (qTable, state, action, reward, nextState, va
  */
 export const updateQTable = (
   qTable, 
-  state, 
-  action, 
-  reward, 
-  nextState, 
-  validNextActions, 
-  params,
-  nextAction = null
+    state, 
+    action, 
+    reward, 
+    nextState, 
+    validNextActions = [], 
+    params = {},
+    nextAction = null
 ) => {
+  if(!params?.algorithm) {
+    console.warn("Missing algoritm in params");
+    return;
+  }
+  console.log("Updating Q values: ", validNextActions);
   const { algorithm } = params;
   
   switch (algorithm) {

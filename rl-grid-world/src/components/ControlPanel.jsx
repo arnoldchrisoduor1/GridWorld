@@ -13,7 +13,7 @@ import {
   ChevronUp,
   Info,
   Flag,
-  Pin
+  Pin,
 } from 'lucide-react';
 import { TRAINING, ALGORITHMS, EXPLORATION_STRATEGIES, CELL_TYPES } from '../utils/constants';
 

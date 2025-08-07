@@ -1,3 +1,5 @@
+// Fixed version of gridUtils.js with corrected getValidActions function
+
 import {
     CELL_TYPES,
     ACTIONS,
@@ -13,7 +15,7 @@ export const createEmptyGrid = (size) => {
 
 // Check if a position is valid within the grid bounds.
 export const isValidPosition = (row, col, gridSize) => {
-    return row >= 0 && row < gridSize && col && col < gridSize;
+    return row >= 0 && row < gridSize && col >= 0 && col < gridSize; // FIXED: added >= 0 check for col
 }
 
 // check if a position is a wall.
@@ -29,7 +31,7 @@ export const getNextPosition = (currentPos, action) => {
     return [row + dRow, col + dCol];
 };
 
-// get valid actions from given positions.
+// FIXED: get valid actions from given positions - now uses the actual grid parameter
 export const getValidActions = (grid, position) => {
     const [row, col] = position;
     const validActions = [];
@@ -38,8 +40,9 @@ export const getValidActions = (grid, position) => {
         const action = ACTIONS[actionKey];
         const [nextRow, nextCol] = getNextPosition([row, col], action);
 
+        // FIXED: Now properly uses the 'grid' parameter instead of GRID_PRESETS
         if(isValidPosition(nextRow, nextCol, grid.length) &&
-            !isWall(GRID_PRESETS, nextRow, nextCol)) {
+            !isWall(grid, nextRow, nextCol)) {
                 validActions.push(action);
             }
     });
@@ -66,7 +69,6 @@ export const positionToState = (position, gridSize) => {
     return row * gridSize + col;
 };
 
-
 // convert 1d state index to 2d state position.
 export const stateToPosition = (state, gridSize) => {
     const row = Math.floor(state / gridSize);
@@ -74,7 +76,12 @@ export const stateToPosition = (state, gridSize) => {
     return [row, col];
 }
 
-// creating teh grid from the present configuration.
+// Check if two positions are equal
+export const positionsEqual = (pos1, pos2) => {
+  return pos1[0] === pos2[0] && pos1[1] === pos2[1];
+};
+
+// Rest of your utility functions remain the same...
 export const createPresetGrid = (preset, size = GRID_SIZE.DEFAULT) => {
   const grid = createEmptyGrid(size);
   
@@ -94,22 +101,16 @@ export const createPresetGrid = (preset, size = GRID_SIZE.DEFAULT) => {
   }
 };
 
-/**
- * Create a simple maze pattern
- */
 const createSimpleMaze = (grid, size) => {
   const newGrid = [...grid];
   
-  // Add some walls to create a simple maze
   if (size >= 5) {
-    // Vertical wall
     for (let i = 1; i < size - 1; i++) {
       if (i !== Math.floor(size / 2)) {
         newGrid[i][Math.floor(size / 2)] = CELL_TYPES.WALL;
       }
     }
     
-    // Horizontal wall
     for (let j = 1; j < size - 1; j++) {
       if (j !== Math.floor(size / 2)) {
         newGrid[Math.floor(size / 2)][j] = CELL_TYPES.WALL;
@@ -120,14 +121,10 @@ const createSimpleMaze = (grid, size) => {
   return newGrid;
 };
 
-/**
- * Create a more complex maze pattern
- */
 const createComplexMaze = (grid, size) => {
   const newGrid = [...grid];
   
   if (size >= 8) {
-    // Create multiple corridors and obstacles
     const walls = [
       [1, 1], [1, 2], [1, 3],
       [3, 5], [3, 6],
@@ -145,16 +142,12 @@ const createComplexMaze = (grid, size) => {
   return newGrid;
 };
 
-/**
- * Create a four rooms environment
- */
 const createFourRooms = (grid, size) => {
   const newGrid = [...grid];
   
   if (size >= 7) {
     const mid = Math.floor(size / 2);
     
-    // Create walls to divide into four rooms
     for (let i = 0; i < size; i++) {
       if (i !== Math.floor(mid / 2) && i !== mid + Math.floor(mid / 2)) {
         newGrid[mid][i] = CELL_TYPES.WALL;
@@ -166,9 +159,6 @@ const createFourRooms = (grid, size) => {
   return newGrid;
 };
 
-/**
- * Get all positions of a specific cell type
- */
 export const getPositionsOfType = (grid, cellType) => {
   const positions = [];
   
@@ -183,29 +173,15 @@ export const getPositionsOfType = (grid, cellType) => {
   return positions;
 };
 
-/**
- * Clone a grid deeply
- */
 export const cloneGrid = (grid) => {
   return grid.map(row => [...row]);
 };
 
-/**
- * Check if two positions are equal
- */
-export const positionsEqual = (pos1, pos2) => {
-  return pos1[0] === pos2[0] && pos1[1] === pos2[1];
-};
-
-/**
- * Get the optimal path using A* algorithm (for comparison purposes)
- */
 export const getOptimalPath = (grid, startPos, goalPos) => {
-  const openSet = [[...startPos, 0, 0, [startPos]]]; // [row, col, g, f, path]
+  const openSet = [[...startPos, 0, 0, [startPos]]];
   const closedSet = new Set();
   
   while (openSet.length > 0) {
-    // Sort by f value and get the node with lowest f
     openSet.sort((a, b) => a[3] - b[3]);
     const [row, col, g, f, path] = openSet.shift();
     
@@ -213,12 +189,10 @@ export const getOptimalPath = (grid, startPos, goalPos) => {
     if (closedSet.has(nodeKey)) continue;
     closedSet.add(nodeKey);
     
-    // Check if we reached the goal
     if (positionsEqual([row, col], goalPos)) {
       return path;
     }
     
-    // Explore neighbors
     Object.values(ACTIONS).forEach(action => {
       const [nextRow, nextCol] = getNextPosition([row, col], action);
       
@@ -236,12 +210,9 @@ export const getOptimalPath = (grid, startPos, goalPos) => {
     });
   }
   
-  return []; // incase no path is found.
+  return [];
 };
 
-/**
- * Generate random valid positions for start and goal
- */
 export const generateRandomPositions = (grid) => {
   const emptyPositions = [];
   

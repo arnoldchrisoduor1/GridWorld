@@ -11,7 +11,7 @@ import {
 } from '../utils/gridUtils.js';
 
 /**
- * Training loop management hook for RL algorithms
+ * Fixed Training loop management hook for RL algorithms
  */
 export const useTraining = (gridWorld, qLearning) => {
   // Training State
@@ -19,7 +19,7 @@ export const useTraining = (gridWorld, qLearning) => {
   const [isPaused, setIsPaused] = useState(false);
   const [currentEpisode, setCurrentEpisode] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
-  const [maxEpisodes, setMaxEpisodes] = useState(TRAINING.MAX_EPISODES);
+  const [maxEpisodes, setMaxEpisodes] = useState(TRAINING.MAX_EPISODES || 1000);
   
   // Episode State
   const [episodeReward, setEpisodeReward] = useState(0);
@@ -27,7 +27,7 @@ export const useTraining = (gridWorld, qLearning) => {
   const [isEpisodeComplete, setIsEpisodeComplete] = useState(false);
   
   // Training Control
-  const [trainingSpeed, setTrainingSpeed] = useState(TRAINING.NORMAL);
+  const [trainingSpeed, setTrainingSpeed] = useState(TRAINING.NORMAL || 100);
   const [autoStop, setAutoStop] = useState(true);
   const [visualizeTraining, setVisualizeTraining] = useState(true);
   
@@ -37,18 +37,19 @@ export const useTraining = (gridWorld, qLearning) => {
   const [stepsHistory, setStepsHistory] = useState([]);
   const [explorationHistory, setExplorationHistory] = useState([]);
   
-  // Current episode state
-  const [agentPosition, setAgentPosition] = useState(null);
+  // Current episode state - FIXED: Use gridWorld as source of truth
   const [episodeTrajectory, setEpisodeTrajectory] = useState([]);
   const [lastAction, setLastAction] = useState(null);
   const [lastReward, setLastReward] = useState(0);
   
-  // Training refs for performance
+  // Training refs for performance and state management
   const trainingRef = useRef({
     intervalId: null,
     startTime: null,
     pausedTime: 0,
-    lastEpsilonUpdate: 0
+    lastEpsilonUpdate: 0,
+    isRunning: false,
+    currentEpisodeNumber: 0 // Track episode number separately to avoid stale closures
   });
   
   const performanceRef = useRef({
@@ -57,14 +58,38 @@ export const useTraining = (gridWorld, qLearning) => {
     convergenceTracking: []
   });
 
+  // Check if training is properly initialized
+  const isProperlyInitialized = useCallback(() => {
+    const hasGridWorld = gridWorld && gridWorld.startPos && gridWorld.goalPos && gridWorld.grid;
+    const hasQLearning = qLearning && qLearning.isInitialized;
+    
+    if (!hasGridWorld) {
+      console.warn('GridWorld not properly initialized:', {
+        startPos: gridWorld?.startPos,
+        goalPos: gridWorld?.goalPos,
+        grid: !!gridWorld?.grid
+      });
+    }
+    
+    if (!hasQLearning) {
+      console.warn('Q-Learning not initialized:', qLearning?.isInitialized);
+    }
+    
+    return hasGridWorld && hasQLearning;
+  }, [gridWorld, qLearning]);
+
   /**
    * Initialize training session
    */
   const initializeTraining = useCallback(() => {
-    if (!gridWorld.startPos || !gridWorld.goalPos || !qLearning.isInitialized) {
+    console.log("Attempting to initialize training...");
+    
+    if (!isProperlyInitialized()) {
       console.warn('Cannot initialize training: incomplete setup');
       return false;
     }
+
+    console.log("Training setup is valid, initializing...");
 
     // Reset training state
     setCurrentEpisode(0);
@@ -73,13 +98,17 @@ export const useTraining = (gridWorld, qLearning) => {
     setEpisodeSteps(0);
     setIsEpisodeComplete(false);
     
-    // Reset agent to start position
-    setAgentPosition([...gridWorld.startPos]);
+    // FIXED: Reset agent to start position in gridWorld (single source of truth)
+    const startPos = [...gridWorld.startPos];
+    gridWorld.moveAgent(startPos); // This updates gridWorld.agentPos
+    
+    // Initialize trajectory
+    const initialState = positionToState(startPos, gridWorld.gridSize);
     setEpisodeTrajectory([{
-      position: [...gridWorld.startPos],
+      position: startPos,
       action: null,
       reward: 0,
-      qValues: qLearning.getQValues(positionToState(gridWorld.startPos, gridWorld.gridSize))
+      qValues: qLearning.getQValues ? qLearning.getQValues(initialState) : []
     }]);
     
     // Clear history
@@ -97,71 +126,97 @@ export const useTraining = (gridWorld, qLearning) => {
     
     trainingRef.current.startTime = Date.now();
     trainingRef.current.pausedTime = 0;
+    trainingRef.current.isRunning = false;
+    trainingRef.current.currentEpisodeNumber = 0;
     
-    console.log('Training initialized');
+    console.log('Training initialized successfully');
     return true;
-  }, [gridWorld.startPos, gridWorld.goalPos, qLearning.isInitialized, qLearning, gridWorld.gridSize]);
+  }, [gridWorld, qLearning, isProperlyInitialized]);
 
   /**
    * Execute a single training step
    */
   const executeTrainingStep = useCallback(() => {
-    if (!agentPosition || isEpisodeComplete) return false;
-
-    const currentState = positionToState(agentPosition, gridWorld.gridSize);
-    const validActions = getValidActions(agentPosition, gridWorld.grid);
+    // FIXED: Use gridWorld.agentPos as source of truth
+    const agentPosition = gridWorld.agentPos;
     
-    // Select action using current policy
-    const selectedAction = qLearning.selectActionForState(currentState, validActions);
-    
-    // Execute step in environment
-    const stepResult = qLearning.executeStep(currentState, selectedAction);
-    const { nextState, nextPosition, reward, isDone, collision } = stepResult;
-    
-    // Update Q-values
-    qLearning.performUpdate(currentState, selectedAction, reward, nextState, isDone);
-    
-    // Update episode state
-    setAgentPosition(nextPosition);
-    setLastAction(selectedAction);
-    setLastReward(reward);
-    setEpisodeReward(prev => prev + reward);
-    setEpisodeSteps(prev => prev + 1);
-    setCurrentStep(prev => prev + 1);
-    
-    // Update trajectory
-    setEpisodeTrajectory(prev => [...prev, {
-      position: [...nextPosition],
-      action: selectedAction,
-      reward,
-      qValues: qLearning.getQValues(nextState),
-      collision
-    }]);
-    
-    // Check if episode is complete
-    if (isDone || episodeSteps >= TRAINING.MAX_STEPS_PER_EPISODE) {
-      completeEpisode(isDone, reward);
-      return true; // Episode completed
+    if (!agentPosition || isEpisodeComplete) {
+      console.log("Cannot execute step: no agent position or episode complete");
+      return false;
     }
-    
-    return false; // Episode continues
-  }, [agentPosition, isEpisodeComplete, gridWorld.gridSize, gridWorld.grid, qLearning, episodeSteps]);
+
+    try {
+      const currentState = positionToState(agentPosition, gridWorld.gridSize);
+      const validActions = getValidActions(gridWorld.grid, agentPosition);
+      
+      if (validActions.length === 0) {
+        console.warn("No valid actions available at position:", agentPosition);
+        return true; // End episode
+      }
+      
+      // Select action using Q-learning policy
+      const selectedAction = qLearning.selectActionForState(currentState, validActions);
+      
+      // Execute step in environment
+      const stepResult = qLearning.executeStep(currentState, selectedAction);
+      const { nextState, nextPosition, reward, isDone, collision } = stepResult;
+      
+      // Update Q-values
+      qLearning.performUpdate(currentState, selectedAction, reward, nextState, isDone);
+      
+      // FIXED: Update agent position in gridWorld (single source of truth)
+      gridWorld.moveAgent(nextPosition);
+      
+      // Update episode tracking
+      setLastAction(selectedAction);
+      setLastReward(reward);
+      setEpisodeReward(prev => prev + reward);
+      setEpisodeSteps(prev => prev + 1);
+      setCurrentStep(prev => prev + 1);
+      
+      // Update trajectory
+      setEpisodeTrajectory(prev => [...prev, {
+        position: [...nextPosition],
+        action: selectedAction,
+        reward,
+        qValues: qLearning.getQValues ? qLearning.getQValues(nextState) : [],
+        collision
+      }]);
+      
+      // Check if episode is complete
+      const maxSteps = TRAINING.MAX_STEPS_PER_EPISODE || 200;
+      if (isDone || episodeSteps >= maxSteps) {
+        // FIXED: Pass current episode number and metrics to avoid stale state
+        completeCurrentEpisode(isDone, reward, episodeSteps, episodeReward + reward);
+        return true; // Episode completed
+      }
+      
+      return false; // Episode continues
+      
+    } catch (error) {
+      console.error("Error in training step:", error);
+      return true; // End episode on error
+    }
+  }, [gridWorld, qLearning, isEpisodeComplete, episodeSteps, episodeReward]);
 
   /**
-   * Complete current episode and start new one
+   * Complete current episode and start new one - FIXED VERSION
    */
-  const completeEpisode = useCallback((success, finalReward) => {
+  const completeCurrentEpisode = useCallback((success, finalReward, steps, totalReward) => {
+    const episodeNumber = trainingRef.current.currentEpisodeNumber + 1;
+    console.log(`Completing episode ${episodeNumber}`);
+    
     const episodeData = {
-      episode: currentEpisode + 1,
-      steps: episodeSteps,
-      reward: episodeReward + finalReward,
+      episode: episodeNumber,
+      steps: steps,
+      reward: totalReward,
       success,
-      epsilon: qLearning.parameters.epsilon,
+      epsilon: qLearning.parameters?.epsilon || 0,
       trajectory: [...episodeTrajectory],
       duration: Date.now() - (trainingRef.current.startTime || Date.now())
     };
     
-    // Update histories
+    // FIXED: Update histories immediately with current values
     setEpisodeHistory(prev => [...prev, episodeData]);
     setRewardHistory(prev => [...prev, episodeData.reward]);
     setStepsHistory(prev => [...prev, episodeData.steps]);
@@ -171,166 +226,214 @@ export const useTraining = (gridWorld, qLearning) => {
     performanceRef.current.episodeTimes.push(episodeData.duration);
     performanceRef.current.totalRewards.push(episodeData.reward);
     
-    // Update epsilon (epsilon decay)
-    if (currentEpisode - trainingRef.current.lastEpsilonUpdate >= 10) {
-      const newEpsilon = Math.max(
-        qLearning.parameters.minEpsilon,
-        qLearning.parameters.epsilon * (1 - qLearning.parameters.epsilonDecay)
-      );
-      qLearning.updateParameters({ epsilon: newEpsilon });
-      trainingRef.current.lastEpsilonUpdate = currentEpisode;
+    // Update epsilon (epsilon decay) every 10 episodes
+    if (episodeNumber - trainingRef.current.lastEpsilonUpdate >= 10) {
+      const currentEpsilon = qLearning.parameters?.epsilon || 0.1;
+      const minEpsilon = qLearning.parameters?.minEpsilon || 0.01;
+      const epsilonDecay = qLearning.parameters?.epsilonDecay || 0.01;
+      
+      const newEpsilon = Math.max(minEpsilon, currentEpsilon * (1 - epsilonDecay));
+      
+      if (qLearning.updateParameters) {
+        qLearning.updateParameters({ epsilon: newEpsilon });
+      }
+      trainingRef.current.lastEpsilonUpdate = episodeNumber;
     }
     
-    setCurrentEpisode(prev => prev + 1);
+    // FIXED: Update episode numbers immediately
+    trainingRef.current.currentEpisodeNumber = episodeNumber;
+    setCurrentEpisode(episodeNumber);
     setIsEpisodeComplete(true);
     
-    // Check if training should continue
-    const shouldContinue = (currentEpisode + 1) < maxEpisodes && 
-                          (!autoStop || !qLearning.trainingStats.convergenceInfo.isConverged);
+    console.log(`Episode completed: ${steps} steps, reward: ${totalReward.toFixed(2)}`);
     
-    if (shouldContinue && isTraining && !isPaused) {
+    // FIXED: Check if training should continue using current episode number
+    const shouldContinue = episodeNumber < maxEpisodes && 
+                          (!autoStop || !qLearning.trainingStats?.convergenceInfo?.isConverged);
+    
+    if (shouldContinue && trainingRef.current.isRunning) {
       // Start new episode after brief pause
-      setTimeout(startNewEpisode, trainingSpeed);
+      const delay = Math.max(10, trainingSpeed);
+      setTimeout(() => {
+        if (trainingRef.current.isRunning) {
+          startNewEpisode();
+        }
+      }, delay);
     } else {
+      console.log("Training complete or stopped");
       stopTraining();
     }
-    
-    console.log(`Episode ${currentEpisode + 1} completed: ${episodeData.steps} steps, reward: ${episodeData.reward.toFixed(2)}`);
-  }, [currentEpisode, episodeSteps, episodeReward, episodeTrajectory, qLearning, maxEpisodes, autoStop, isTraining, isPaused, trainingSpeed]);
+  }, [qLearning, episodeTrajectory, maxEpisodes, autoStop, trainingSpeed]);
 
   /**
-   * Start a new episode
+   * Start a new episode - FIXED VERSION
    */
   const startNewEpisode = useCallback(() => {
-    if (!gridWorld.startPos) return;
+    if (!gridWorld.startPos) {
+      console.warn("Cannot start new episode: no start position");
+      return;
+    }
+    
+    const nextEpisodeNumber = trainingRef.current.currentEpisodeNumber + 1;
+    console.log(`Starting episode ${nextEpisodeNumber}`);
     
     // Reset episode state
     setEpisodeReward(0);
     setEpisodeSteps(0);
     setIsEpisodeComplete(false);
-    setAgentPosition([...gridWorld.startPos]);
+    
+    // FIXED: Reset agent position in gridWorld (single source of truth)
+    const startPos = [...gridWorld.startPos];
+    gridWorld.moveAgent(startPos);
+    
+    const initialState = positionToState(startPos, gridWorld.gridSize);
     setEpisodeTrajectory([{
-      position: [...gridWorld.startPos],
+      position: startPos,
       action: null,
       reward: 0,
-      qValues: qLearning.getQValues(positionToState(gridWorld.startPos, gridWorld.gridSize))
+      qValues: qLearning.getQValues ? qLearning.getQValues(initialState) : []
     }]);
+    
     setLastAction(null);
     setLastReward(0);
     
     trainingRef.current.startTime = Date.now();
-  }, [gridWorld.startPos, qLearning, gridWorld.gridSize]);
+    
+    // Continue training loop
+    if (trainingRef.current.isRunning) {
+      scheduleNextStep();
+    }
+  }, [gridWorld, qLearning]);
 
   /**
-   * Start training process
+   * Schedule the next training step
    */
- // Inside useTraining.js
-const startTraining = useCallback(() => {
-    // 1. Always attempt to initialize if not already training.
-    if (!isTraining) {
-        const initializationSuccess = initializeTraining();
-        if (!initializationSuccess) {
-            console.warn('Initialization failed, cannot start training.');
-            return false;
+  const scheduleNextStep = useCallback(() => {
+    if (!trainingRef.current.isRunning) return;
+    
+    trainingRef.current.intervalId = setTimeout(() => {
+      if (trainingRef.current.isRunning) {
+        const episodeCompleted = executeTrainingStep();
+        if (!episodeCompleted) {
+          scheduleNextStep(); // Continue with next step
         }
+        // If episode completed, completeCurrentEpisode will handle continuation
+      }
+    }, Math.max(1, trainingSpeed));
+  }, [executeTrainingStep, trainingSpeed]);
+
+  /**
+   * Start training process - FIXED VERSION
+   */
+  const startTraining = useCallback(() => {
+    console.log("Starting training...");
+    
+    // Stop any existing training first
+    if (trainingRef.current.intervalId) {
+      clearTimeout(trainingRef.current.intervalId);
+      trainingRef.current.intervalId = null;
+    }
+    
+    // Initialize if needed
+    const initialized = initializeTraining();
+    if (!initialized) {
+      console.error('Failed to initialize training');
+      return false;
     }
 
-    // 2. Set training state to true immediately after successful initialization.
+    // Set training state
     setIsTraining(true);
     setIsPaused(false);
-
-    // 3. Define the training loop
-    const runTrainingLoop = () => {
-        if (!isTraining || isPaused) return;
-
-        const episodeCompleted = executeTrainingStep();
-
-        if (!episodeCompleted && isTraining && !isPaused) {
-            trainingRef.current.intervalId = setTimeout(runTrainingLoop, trainingSpeed);
-        }
-    };
+    trainingRef.current.isRunning = true;
     
-    // 4. Start the loop.
-    runTrainingLoop();
-    console.log('Training started');
+    console.log('Training started successfully');
+    
+    // Start the training loop
+    scheduleNextStep();
+    
     return true;
-}, [isTraining, initializeTraining, isPaused, executeTrainingStep, trainingSpeed]);
+  }, [initializeTraining, scheduleNextStep]);
 
   /**
    * Pause training
    */
   const pauseTraining = useCallback(() => {
+    console.log('Pausing training');
     setIsPaused(true);
+    trainingRef.current.isRunning = false;
+    
     if (trainingRef.current.intervalId) {
       clearTimeout(trainingRef.current.intervalId);
       trainingRef.current.intervalId = null;
     }
-    console.log('Training paused');
   }, []);
 
   /**
    * Resume training
    */
   const resumeTraining = useCallback(() => {
-    if (!isTraining) return;
+    if (!isTraining) {
+      console.warn('Cannot resume: training not active');
+      return;
+    }
     
+    console.log('Resuming training');
     setIsPaused(false);
+    trainingRef.current.isRunning = true;
     
-    const runTrainingLoop = () => {
-      if (!isTraining || isPaused) return;
-      
-      const episodeCompleted = executeTrainingStep();
-      
-      if (!episodeCompleted && isTraining && !isPaused) {
-        trainingRef.current.intervalId = setTimeout(runTrainingLoop, trainingSpeed);
-      }
-    };
-    
-    runTrainingLoop();
-    console.log('Training resumed');
-  }, [isTraining, isPaused, executeTrainingStep, trainingSpeed]);
+    scheduleNextStep();
+  }, [isTraining, scheduleNextStep]);
 
   /**
    * Stop training
    */
   const stopTraining = useCallback(() => {
+    console.log(`Stopping training after ${trainingRef.current.currentEpisodeNumber} episodes`);
+    
     setIsTraining(false);
     setIsPaused(false);
+    trainingRef.current.isRunning = false;
     
     if (trainingRef.current.intervalId) {
       clearTimeout(trainingRef.current.intervalId);
       trainingRef.current.intervalId = null;
     }
-    
-    console.log(`Training stopped after ${currentEpisode} episodes`);
-  }, [currentEpisode]);
+  }, []);
 
   /**
    * Reset training completely
    */
   const resetTraining = useCallback(() => {
+    console.log('Resetting training');
     stopTraining();
+    
+    if (qLearning.reset) {
+      qLearning.reset();
+    }
+    
     initializeTraining();
-    qLearning.reset();
-    console.log('Training reset');
   }, [stopTraining, initializeTraining, qLearning]);
 
   /**
    * Run single step manually (for debugging/demonstration)
    */
   const stepOnce = useCallback(() => {
-    if (isTraining) return false;
+    if (isTraining && trainingRef.current.isRunning) {
+      console.log("Cannot step manually while training is running");
+      return false;
+    }
     
+    const agentPosition = gridWorld.agentPos;
     if (isEpisodeComplete || !agentPosition) {
       startNewEpisode();
       return true;
     }
     
     return executeTrainingStep();
-  }, [isTraining, isEpisodeComplete, agentPosition, startNewEpisode, executeTrainingStep]);
+  }, [isTraining, isEpisodeComplete, gridWorld.agentPos, startNewEpisode, executeTrainingStep]);
 
   /**
-   * Calculate training performance metrics
+   * Calculate training performance metrics - FIXED
    */
   const getPerformanceMetrics = useMemo(() => {
     if (episodeHistory.length === 0) {
@@ -340,7 +443,8 @@ const startTraining = useCallback(() => {
         successRate: 0,
         convergenceRate: 0,
         episodesPerSecond: 0,
-        explorationDecline: 0
+        explorationDecline: 0,
+        totalEpisodes: 0
       };
     }
     
@@ -361,30 +465,33 @@ const startTraining = useCallback(() => {
       averageReward: averageReward.toFixed(2),
       averageSteps: averageSteps.toFixed(1),
       successRate: (successRate * 100).toFixed(1),
-      convergenceRate: qLearning.trainingStats.convergenceInfo.convergenceValue.toFixed(4),
+      convergenceRate: qLearning.trainingStats?.convergenceInfo?.convergenceValue?.toFixed(4) || '0.0000',
       episodesPerSecond: episodesPerSecond.toFixed(2),
-      explorationDecline: (explorationDecline * 100).toFixed(1)
+      explorationDecline: (explorationDecline * 100).toFixed(1),
+      totalEpisodes: episodeHistory.length
     };
-  }, [episodeHistory, explorationHistory, qLearning.trainingStats.convergenceInfo]);
+  }, [episodeHistory, explorationHistory, qLearning.trainingStats]);
 
   /**
-   * Get current training status
+   * Get current training status - FIXED
    */
   const getTrainingStatus = useMemo(() => {
+    const currentEpisodeNumber = trainingRef.current.currentEpisodeNumber;
+    
     return {
       isTraining,
       isPaused,
-      currentEpisode,
+      currentEpisode: currentEpisodeNumber,
       currentStep,
       maxEpisodes,
-      progress: maxEpisodes > 0 ? (currentEpisode / maxEpisodes) * 100 : 0,
-      isComplete: currentEpisode >= maxEpisodes || qLearning.trainingStats.convergenceInfo.isConverged,
+      progress: maxEpisodes > 0 ? (currentEpisodeNumber / maxEpisodes) * 100 : 0,
+      isComplete: currentEpisodeNumber >= maxEpisodes || qLearning.trainingStats?.convergenceInfo?.isConverged,
       
       // Current episode info
       episodeReward,
       episodeSteps,
       isEpisodeComplete,
-      agentPosition,
+      agentPosition: gridWorld.agentPos, // FIXED: Use gridWorld as source of truth
       lastAction,
       lastReward,
       
@@ -393,10 +500,10 @@ const startTraining = useCallback(() => {
       visualizeTraining
     };
   }, [
-    isTraining, isPaused, currentEpisode, currentStep, maxEpisodes,
-    episodeReward, episodeSteps, isEpisodeComplete, agentPosition,
+    isTraining, isPaused, currentStep, maxEpisodes,
+    episodeReward, episodeSteps, isEpisodeComplete, gridWorld.agentPos,
     lastAction, lastReward, episodeTrajectory, visualizeTraining,
-    qLearning.trainingStats.convergenceInfo
+    qLearning.trainingStats
   ]);
 
   // Cleanup on unmount
@@ -405,20 +512,9 @@ const startTraining = useCallback(() => {
       if (trainingRef.current.intervalId) {
         clearTimeout(trainingRef.current.intervalId);
       }
+      trainingRef.current.isRunning = false;
     };
   }, []);
-
-  // Auto-pause when window loses focus (optional performance optimization)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && isTraining && !isPaused) {
-        pauseTraining();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isTraining, isPaused, pauseTraining]);
 
   return {
     // Training Control
@@ -445,10 +541,13 @@ const startTraining = useCallback(() => {
     stepsHistory,
     explorationHistory,
     
-    // Current Episode
-    agentPosition,
+    // Current Episode - FIXED: Use gridWorld as source of truth
+    agentPosition: gridWorld.agentPos,
     episodeTrajectory,
     lastAction,
-    lastReward
+    lastReward,
+    
+    // Debug info
+    isProperlyInitialized: isProperlyInitialized()
   };
 };
